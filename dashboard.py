@@ -49,7 +49,7 @@ if os.path.exists(db_path):
         if st.button("Verify & Restore Selected Backup"):
             with st.spinner('Decrypting and verifying integrity...'):
                 # backup_engine.py içindeki restore fonksiyonunu çağırdık
-                status_message = restore_backup(selected_file)
+                status_message = restore_backup(selected_file, "data_to_backup")
                 if "Verified" in status_message:
                     st.success(status_message)
                 else:
