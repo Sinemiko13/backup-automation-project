@@ -1,43 +1,69 @@
+# -*- coding: utf-8 -*-
+# 1 2 3 4 5...
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime
+import sqlite3
+import subprocess
+from src.backup_engine import restore_backup # Engine'deki restore fonksiyonunu bağladık
 
-# Sayfa Ayarları
+# Page Config
 st.set_page_config(page_title="Cyber Backup Monitor", page_icon="🛡️")
 
-st.title("🛡️ Siber Yedekleme ve İzleme Paneli")
+st.title("🛡️ Cyber Backup & Monitoring Panel")
 st.markdown("---")
 
-# 1. Yan Menü - İstatistikler
-st.sidebar.header("📊 Sistem Durumu")
+# --- # 1. SIDEBAR - SYSTEM STATUS ---
+st.sidebar.header("📊 System Status")
 if os.path.exists("backups"):
     backup_count = len([f for f in os.listdir("backups") if f.endswith(".enc")])
-    st.sidebar.metric("Toplam Güvenli Yedek", backup_count)
+    st.sidebar.metric("Total Secure Backups", backup_count)
 
-# 2. Canlı Log İzleme
-st.subheader("📜 Sistem Günlükleri (Logs)")
+# --- # 2. LOG VIEWER ---
+st.subheader("📜 System Logs")
 if os.path.exists("backup.log"):
     with open("backup.log", "r") as f:
         logs = f.readlines()
-        # Son 10 logu ters sırada göster
-        st.text_area("Son İşlemler", "".join(logs[-10:][::-1]), height=200)
+        st.text_area("Recent Actions", "".join(logs[-10:][::-1]), height=200)
 else:
-    st.warning("Henüz log kaydı oluşturulmadı.")
+    st.warning("No logs found yet.")
 
-# 3. Yedeklenmiş Dosyalar Listesi
-st.subheader("📁 Mevcut Yedekler")
-if os.path.exists("backups"):
-    files = os.listdir("backups")
-    if files:
-        df = pd.DataFrame(files, columns=["Dosya Adı"])
-        st.table(df)
+# --- # 3. DATABASE RECORDS & RESTORE SECTION ---
+st.subheader("📁 Database Records & Recovery")
+db_path = "backups_metadata.db"
+
+if os.path.exists(db_path):
+    conn = sqlite3.connect(db_path)
+    # Database'den yedek kayıtlarını çekiyoruz
+    df = pd.read_sql_query("SELECT filename, date, original_hash FROM backup_records", conn)
+    conn.close()
+
+    if not df.empty:
+        st.dataframe(df, use_container_width=True) # Tabloyu daha şık gösterir
+        
+        # Restore Feature
+        st.markdown("---")
+        st.subheader("🔄 Emergency Restore & Verify")
+        selected_file = st.selectbox("Select a backup to restore:", df['filename'].tolist())
+        
+        if st.button("Verify & Restore Selected Backup"):
+            with st.spinner('Decrypting and verifying integrity...'):
+                # backup_engine.py içindeki restore fonksiyonunu çağırdık
+                status_message = restore_backup(selected_file)
+                if "Verified" in status_message:
+                    st.success(status_message)
+                else:
+                    st.error(status_message)
     else:
-        st.info("Yedek klasörü boş.")
+        st.info("Database is empty. Run a backup first!")
+else:
+    st.info("Database not found. Initializing on first run...")
 
-# 4. Manuel Tetikleme Butonu
-if st.button("🚀 Manuel Yedeklemeyi Başlat"):
-    with st.spinner('Yedekleniyor ve Şifreleniyor...'):
-        import subprocess
+# --- # 4. MANUAL TRIGGER ---
+st.markdown("---")
+if st.button("🚀 Start Manual Backup"):
+    with st.spinner('Running multi-source backup...'):
+        # Arka planda backup_engine.py dosyasını çalıştırır
         result = subprocess.run(["python", "src/backup_engine.py"], capture_output=True, text=True)
-        st.success("Yedekleme işlemi başarıyla tetiklendi!")
+        st.success("Backup process triggered successfully!")
+        st.rerun() # Sayfayı yenileyerek yeni yedeği listeye ekler
