@@ -6,6 +6,9 @@ import hashlib
 import logging
 from cryptography.fernet import Fernet
 
+from dotenv import load_dotenv
+load_dotenv() # .env dosyasındaki değişkenleri sisteme yükler
+
 # --- # 1. MERKEZİ LOG YÖNETİMİ ---
 # Tüm işlemler 'backup.log' dosyasına kaydedilir.
 logging.basicConfig(
@@ -48,9 +51,11 @@ def encrypt_file(file_path, key):
     logging.info(f"Dosya AES-256 ile şifrelendi: {file_path}")
 
 def create_backup():
-    # --- # 3. DİNAMİK YAPI ---
-    # Yedeklenecek klasörleri buradan liste olarak yönetebilirsin.
-    source_dirs = ["data_to_backup"] 
+    # .env'den listeyi çek (Hata payına karşı 'data_to_backup' varsayılan kalsın)
+    raw_sources = os.getenv("BACKUP_SOURCES", "data_to_backup")
+    source_dirs = raw_sources.split(",") # Virgüllere göre parçalayıp listeye çevirir
+    
+    # ... (kodun geri kalanı aynı, sadece döngü içine girecek)
     backup_dir = "backups"
     
     if not os.path.exists(backup_dir):
